@@ -3,19 +3,22 @@
 #include <Arduino_LPS22HB.h>      // Pressure Sensor Library
 #include <Arduino_LSM9DS1.h>      // Magnetometer Sensor Library
 
+const float SoundSensorPin = A1; //this pin read the analog voltage from the sound level meter
+#define VREF  3.3  //voltage on AREF pin,default:operating voltage
+
 
 // watchdog timeout in seconds
 int wdt = 180;
 
 // Initalizing global variables for sensor data to pass onto BLE
-String p, t, h, m;
+String p, t, h, m, d;
 
 
 // The name of the room where the sensor will be installed there. Make sure that the room_name is matched with the room name at the BIM model.
-String room_name = "A-1541";
+String room_name = "A-1544.2";
 
 //The device_id should be a uniqe id in the azure IoT hub in the section of devices
-String device_id = "A-1541";
+String device_id = "A-1544.2";
 void(* resetFunc) (void) = 0;
 // BLE Service Name
 BLEService EnvironmentalSensing ("290C");
@@ -23,6 +26,7 @@ BLEService EnvironmentalSensing ("290C");
 // BLE Characteristics
 // Syntax: BLE<DATATYPE>Characteristic <NAME>(<UUID>, <PROPERTIES>, <DATA LENGTH>)
 BLEStringCharacteristic ble_pressure("2A6D", BLERead | BLENotify, 13);
+BLEStringCharacteristic ble_decibel("2A58", BLERead | BLENotify, 20);
 BLEStringCharacteristic ble_temperature("2A6E", BLERead | BLENotify, 13);
 BLEStringCharacteristic ble_humidity("2A6F", BLERead | BLENotify, 13);
 BLEStringCharacteristic ble_magnetic("2AA0 ", BLERead | BLENotify, 20);
@@ -68,6 +72,7 @@ void setup()
     
     // Adding characteristics to BLE Service Advertisment
     EnvironmentalSensing .addCharacteristic(ble_pressure);
+    EnvironmentalSensing .addCharacteristic(ble_decibel);
     EnvironmentalSensing .addCharacteristic(ble_temperature);
     EnvironmentalSensing .addCharacteristic(ble_humidity);
     EnvironmentalSensing .addCharacteristic(ble_magnetic);
@@ -101,6 +106,7 @@ void loop()
 
             // Writing sensor values to the characteristic
             ble_pressure.writeValue(p);
+            ble_decibel.writeValue(d);
             ble_temperature.writeValue(t);
             ble_humidity.writeValue(h);
             ble_magnetic.writeValue(m);
@@ -109,6 +115,7 @@ void loop()
             // Displaying the sensor values on the Serial Monitor
             Serial.println("Reading Sensors");
             Serial.println(p);
+            Serial.println(d);
             Serial.println(t);
             Serial.println(h);
             Serial.println(m);
@@ -124,10 +131,13 @@ void loop()
 void readValues()
 {
     // Reading raw sensor values from three sensors
+  
     float x, y, z;
     float pressure = BARO.readPressure();
     float temperature = HTS.readTemperature();
     float humidity    = HTS.readHumidity();
+    float voltageValue = analogRead(SoundSensorPin) / 1024.0 * VREF;
+    float dbValue = voltageValue * 50.0;  //convert voltage to decibel value
     if (IMU.magneticFieldAvailable()) {
       IMU.readMagneticField(x, y, z);
 
@@ -135,6 +145,7 @@ void readValues()
     p = String(pressure);
     t = String(temperature-5);
     h = String(humidity+5);
-    m =   String(x) + String(y);
+    m = String(x) + String(y);
+    d = String(dbValue);
     }
 }
